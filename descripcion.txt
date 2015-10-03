@@ -1,0 +1,12 @@
+Migracion De Datos
+Para la migración de los datos lo primero que se hizo fue usar una herramienta que nos permitiera crear 
+la estructura de la base de datos de postgreSQL  apratir de la base de datos de sql-server para ello 
+usamos una herramienta encontrada en la siguiente página.
+
+https://grimpidev.wordpress.com/2011/04/22/como-migrar-una-base-de-datos-de-sql-server-a-postgresql/
+
+La cual nos crea un script con la estructura de la base datos para postgreSQL.
+Para poder ejecutar el script se debe crear la base de datos AdventureWorksDW2014 y 
+ejecutar el script como pgscript.
+Una vez creada la estructura de la base de datos se procede con la migración de los datos, 
+para ello se realizó una aplicación en java, en la cual se realiza la migración de los datos de todas las tablas. 
