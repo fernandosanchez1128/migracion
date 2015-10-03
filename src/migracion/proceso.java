@@ -26,52 +26,60 @@ public class proceso {
         conexion = new ConexionBD();      
      }
      
-     public void leer () throws SQLException
+     /**
+      * @brief metodo principal encargado de realizar la migracion de los datos 
+      * de sql-server a postgresql.
+      * @return  migracion de la base de datos
+      * @throws SQLException captura las excepciones sql
+      */
+     public void migracion () throws SQLException
      {
+         //conexion a sql-server
          Connection conn = conexion.conectarBD();
          Statement stmt = conn.createStatement();
          
-      
+    //arreglo con el nombre de las tablas  
      String [] tablas = {
-//         "dbo.AdventureWorksDWBuildVersion","adventure_works_dwbuild_version",
-//         "dbo.DimProductCategory","dim_product_category",
-//         "dbo.DimProductSubcategory","dim_product_subcategory","dbo.DimPromotion","dim_promotion",
-//         "dbo.DatabaseLog","database_log","dbo.DimAccount","dim_account",
-//         "dbo.dimCurrency","dim_currency",
-//         "dbo.DimSalesTerritory","dim_sales_territory",
-//         "dbo.DimGeography","dim_geography", "dbo.DimProduct","dim_product",
-//         "dbo.DimCustomer", "dim_customer", "dbo.dimDate","dim_date","dbo.DimDepartmentGroup","dim_department_group", 
-         "dbo.DimEmployee","dim_employee", //problem
-//         "dbo.DimOrganization","dim_organization", //problem
-//         "dbo.DimReseller","dim_reseller","dbo.DimSalesReason","dim_sales_reason",
-//         "dbo.DimScenario","dimscenario",
-//         "dbo.FactAdditionalInternationalProductDescription","fact_additional_international_product_description",
-//     "dbo.FactCallCenter","fact_call_center","dbo.FactCurrencyRate","fact_currency_rate",
-//     "dbo.FactFinance","fact_finance","dbo.FactInternetSales","fact_internet_sales",
-//     "dbo.FactInternetSalesReason","fact_internet_sales_reason","dbo.FactProductInventory","fact_product_inventory",
-//     "dbo.FactResellerSales","fact_reseller_sales","dbo.FactSalesQuota","fact_sales_quota",
-//     "dbo.FactSurveyResponse","fact_survey_response","dbo.NewFactCurrencyRate.","new_fact_currency_rate",
-//     "dbo.ProspectiveBuyer","prospective_buyer"
+         "AdventureWorksDWBuildVersion",    "DimProductCategory",
+         "DimProductSubcategory",   "DimPromotion",
+         "DatabaseLog",     "DimAccount",
+         "DimCurrency",     "DimSalesTerritory",
+         "DimGeography",    "DimProduct",
+         "DimCustomer",     "DimDate",  
+         "DimDepartmentGroup",   "DimEmployee",   
+         "DimOrganization",  "DimReseller",
+         "DimSalesReason",  "DimScenario",
+         "FactAdditionalInternationalProductDescription",   "FactCallCenter",
+         "FactCurrencyRate",    "FactFinance",
+         "FactInternetSales",   "FactInternetSalesReason",
+         "FactProductInventory",    "FactResellerSales",
+         "FactSalesQuota",  "FactSurveyResponse",
+         "NewFactCurrencyRate", "ProspectiveBuyer",
      };
      
+     //conexion a postgres
      Connection con_postgres = conexion.conectarPostgres();
      Statement stmt_post = con_postgres.createStatement();
-     for (int index=1; index <= tablas.length;index+=2)
+     
+     for (int index=1; index <= tablas.length;index++)
      {
-         if (tablas[index] != "dim_employee" && tablas[index] !="dim_organization")
+         //caso especial de tablas recursivas
+         if (tablas[index-1] != "DimEmployee" && tablas[index-1] !="DimOrganization")
          {
      
-            String sql_consulta =  "SELECT * FROM " + tablas[index-1];
+            //consulta a sql-server para traer los datos 
+            String sql_consulta =  "SELECT * FROM " + "dbo."+tablas[index-1];
 
             ResultSet rs = stmt.executeQuery(sql_consulta);
 
             String sql_save ="";
-
+            
+            //while donde se hace el paso de los datos
             while (rs.next())
             {
                 ResultSetMetaData rsMd = rs.getMetaData();
                 int cantidadColumnas = rsMd.getColumnCount();
-                sql_save = "INSERT INTO " + tablas[index] + " values (";
+                sql_save = "INSERT INTO \"" + tablas[index-1] + "\" values (";
                 for (int i=1;i<=cantidadColumnas;i++)
                 {
                     ResultSetMetaData meta = rs.getMetaData();
@@ -144,20 +152,27 @@ public class proceso {
          } 
          else
      {
-             tabla_recursiva(tablas[index-1],tablas[index]);
+             tabla_recursiva(tablas[index-1]);
              
      }
      }
      
      }
      
-     public void tabla_recursiva (String name_sql_server, String name) throws SQLException
+     /**
+      * @brief metodo que se encarga de pasar las tablas recursivas, pasa 
+      * todos los datos menos la columna que tiene referencia a ella misma ya que
+      * genera exepcion por restriccion de llave foranea.
+      * @param name nombre de la tabla que tieen una relacion recursiva
+      * @throws SQLException 
+      */
+     public void tabla_recursiva (String name) throws SQLException
      {
          Connection conn = conexion.conectarBD();
          Statement stmt = conn.createStatement();
          Connection con_postgres = conexion.conectarPostgres();
          Statement stmt_post = con_postgres.createStatement();
-         String sql_consulta =  "SELECT * FROM " + name_sql_server;
+         String sql_consulta =  "SELECT * FROM " + "dbo." + name;
 
             ResultSet rs = stmt.executeQuery(sql_consulta);
 
@@ -167,7 +182,7 @@ public class proceso {
             {
                 ResultSetMetaData rsMd = rs.getMetaData();
                 int cantidadColumnas = rsMd.getColumnCount();
-                sql_save = "INSERT INTO " + name + " values (";
+                sql_save = "INSERT INTO \"" + name + "\" values (";
                 for (int i=1;i<=cantidadColumnas;i++)
                 {
                     ResultSetMetaData meta = rs.getMetaData();
@@ -218,13 +233,50 @@ public class proceso {
             System.out.println(sql_save);
                 stmt_post.executeUpdate(sql_save);
             }
-            actualizar_pad
+            actualizar_padre(name);
      }
      
-     public void actualizar_padre()
+     /**
+      * @brief despues de pasar los datos de las tablas recursivas
+      * este metodo se encarga de actualizar la columna que se referencia a 
+      * ella misma.
+      * @param name nombre de la tabla
+      * @throws SQLException 
+      */
+     public void actualizar_padre(String name) throws SQLException
+     {
+         Connection conn = conexion.conectarBD();
+         Statement stmt = conn.createStatement();
+         Connection con_postgres = conexion.conectarPostgres();
+         Statement stmt_post = con_postgres.createStatement(); 
+         String sql_consulta =  "SELECT * FROM " + "dbo." + name;
+         ResultSet rs = stmt.executeQuery(sql_consulta);
+                
+         while (rs.next())
+         {
+            ResultSetMetaData rsMd = rs.getMetaData();
+            String pk = rsMd.getColumnName(1);
+            String nombre_columna = rsMd.getColumnName(2);
+            String sql_update = "";
+            if (rs.getObject(2) != null)
+            {
+                sql_update = "UPDATE \"" + name + "\" SET \"" + nombre_columna + "\" ='" +
+                rs.getObject(2) + "' WHERE \""+ pk + "\" ='" + rs.getObject(1)+"'";
+                System.out.println(sql_update);
+            }
+            else
+            {
+                sql_update = "UPDATE \"" + name + "\" SET \"" + nombre_columna + "\" =" +
+                rs.getObject(2) + " WHERE \""+ pk + "\" ='" + rs.getObject(1)+"'";
+                System.out.println(sql_update);
+            }
+            stmt_post.executeUpdate(sql_update);
+         }
+         
+     }
        public static void main(String[] args) throws SQLException {
            proceso process =  new proceso();
-           process.leer();
+           process.migracion();
         
 
     }
